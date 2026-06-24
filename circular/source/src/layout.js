@@ -1,62 +1,54 @@
-// Matika troch rozložení. Každá funkcia vracia cieľovú pozíciu + rotáciu
-// pre kartu `i` z `n` kariet, v závislosti od leva parametrov.
-// pos/rot sú obyčajné objekty {x,y,z}, ktoré sa potom lerpujú v Card useFrame.
+// Matika 4 rozložení podľa referencie: Flat, Tilt, Ring, Gallery.
+// Vracia cieľ {pos:{x,y,z}, rot:{x,y,z}} pre kartu i z n, podľa parametrov.
+// Pozn.: globálny náklon/rotáciu prstenca rieši skupina v Scene (parallax + spin).
 
-const CARD_W = 1.0
-const CARD_H = 1.5
+export const CARD_W = 1.0
+export const CARD_H = 1.4
 
-// RING — vertikálny prstenec okolo osi Y, karty čelom von.
-function ringTarget(i, n, R) {
-  const theta = (i / n) * Math.PI * 2
+// FLAT — vzpriamený ovál kariet v rovine obrazovky, čelom k divákovi.
+function flat(i, n, R) {
+  const a = (i / n) * Math.PI * 2
+  const Rx = R * 1.25
+  const Ry = R * 1.0
+  return { pos: { x: Rx * Math.sin(a), y: Ry * Math.cos(a), z: 0 }, rot: { x: 0, y: 0, z: 0 } }
+}
+
+// TILT — plytký horizontálny vejár cez stred, mierne natočené do stredu.
+function tilt(i, n, R) {
+  const spread = 1.5
+  const t = n === 1 ? 0 : i / (n - 1) - 0.5
+  const ang = t * spread
+  const arcR = R * 1.7
   return {
-    pos: { x: R * Math.sin(theta), y: 0, z: R * Math.cos(theta) },
-    rot: { x: 0, y: theta, z: 0 },
+    pos: { x: arcR * Math.sin(ang), y: -R * 0.05, z: -arcR * (1 - Math.cos(ang)) * 0.6 },
+    rot: { x: 0.04, y: -ang * 0.55, z: 0 },
   }
 }
 
-// FAN — plytký horizontálny oblúk v spodnej časti, karty natočené do stredu.
-function fanTarget(i, n, R) {
-  const spread = Math.PI // 180°
-  const t = n === 1 ? 0 : i / (n - 1) - 0.5 // -0.5 .. +0.5
-  const angle = t * spread
-  const arcR = R * 1.4
+// RING — karusel v rovine XZ, karty čelom von; skupina sa nakláňa v Scene → 3D elipsa.
+function ring(i, n, R) {
+  const a = (i / n) * Math.PI * 2
   return {
-    pos: {
-      x: arcR * Math.sin(angle),
-      y: -R * 0.55,
-      z: -arcR * (1 - Math.cos(angle)) * 0.5,
-    },
-    rot: { x: 0.08, y: -angle * 0.6, z: 0 },
+    pos: { x: R * Math.sin(a), y: 0, z: R * Math.cos(a) },
+    rot: { x: 0, y: a, z: 0 },
   }
 }
 
-// GALLERY — 2 rady vedľa seba s jemným panoramatickým zakrivením.
-function galleryTarget(i, n, R) {
-  const rows = n > 6 ? 2 : 1
-  const cols = Math.ceil(n / rows)
-  const row = Math.floor(i / cols)
-  const col = i % cols
-  const cw = CARD_W * 1.25
-  const rh = CARD_H * 1.23
-  const cx = col - (cols - 1) / 2
-  const cy = row - (rows - 1) / 2
-  const curve = 0.18
+// GALLERY — jeden horizontálny rad cez šírku, jemné vertikálne rozhodenie + z-krivka.
+function gallery(i, n, R) {
+  const cw = CARD_W * 1.18
+  const cx = i - (n - 1) / 2
   const x = cx * cw
+  const stagger = (i % 2 === 0 ? 1 : -1) * 0.12
   return {
-    pos: {
-      x,
-      y: -cy * rh,
-      z: -(x * x) * curve,
-    },
-    rot: { x: 0, y: -x * curve * 0.9, z: 0 },
+    pos: { x, y: stagger, z: -(x * x) * 0.04 },
+    rot: { x: 0, y: -x * 0.05, z: 0 },
   }
 }
 
-export function computeTarget(mode, i, n, params) {
-  const R = params.radius
-  if (mode === 'ring') return ringTarget(i, n, R)
-  if (mode === 'fan') return fanTarget(i, n, R)
-  return galleryTarget(i, n, R)
+export function computeTarget(mode, i, n, R) {
+  if (mode === 'flat') return flat(i, n, R)
+  if (mode === 'tilt') return tilt(i, n, R)
+  if (mode === 'ring') return ring(i, n, R)
+  return gallery(i, n, R)
 }
-
-export { CARD_W, CARD_H }

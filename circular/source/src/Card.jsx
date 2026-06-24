@@ -6,86 +6,87 @@ import { easing } from 'maath'
 import { computeTarget, CARD_H } from './layout.js'
 import { makeCardTexture } from './texture.js'
 
-// Jedna karta galérie. Každý frame si zráta cieľový transform (podľa módu alebo
-// detail view) a damp-uje k nemu pozíciu, rotáciu, mierku aj priehľadnosť.
 export default function Card({
-  project,
-  index,
-  count,
-  mode,
-  params,
-  selectedIndex,
-  hoveredRef,
-  onHover,
-  onSelect,
+  project, index, count, mode, params, selectedIndex, hoveredRef, onHover, onSelect,
 }) {
   const ref = useRef()
   const matRef = useRef()
 
-  // procedurálna textúra — raz na projekt
-  const tex = useMemo(() => makeCardTexture(project), [project.id])
-  useEffect(() => () => tex.dispose(), [tex])
+  // textúra: reálny screenshot (TextureLoader) alebo procedurálny fallback
+  const tex = useMemo(() => {
+    if (project.img) {
+      const t = new THREE.TextureLoader().load(project.img)
+      t.colorSpace = THREE.SRGBColorSpace
+      t.anisotropy = 8
+      return t
+    }
+    return makeCardTexture(project)
+  }, [project.img, project.repo])
+  useEffect(() => () => tex.dispose && tex.dispose(), [tex])
 
-  // reusovateľné dočasné objekty (žiadne alokácie v useFrame)
-  const tmp = useMemo(
-    () => ({
-      pos: new THREE.Vector3(),
-      euler: new THREE.Euler(),
-      quat: new THREE.Quaternion(),
-      fwd: new THREE.Vector3(),
-      camPos: new THREE.Vector3(),
-    }),
-    [],
-  )
+  const tmp = useMemo(() => ({
+    pos: new THREE.Vector3(), euler: new THREE.Euler(), quat: new THREE.Quaternion(),
+    fwd: new THREE.Vector3(), camPos: new THREE.Vector3(), world: new THREE.Vector3(),
+  }), [])
 
   useFrame((state, dt) => {
     const m = ref.current
     if (!m) return
-
     const anySelected = selectedIndex !== null
     const isSelected = selectedIndex === index
-    let targetScale = 1
-    let targetOpacity = 1
+    let scale = params.cardSize
+    let opacity = 1
 
     if (anySelected) {
       if (isSelected) {
-        // vybraná karta letí pred kameru a roztiahne sa na výplň viewportu
         const cam = state.camera
-        const dist = 3.2
+        const dist = 3.4
         tmp.fwd.set(0, 0, -1).applyQuaternion(cam.quaternion)
         cam.getWorldPosition(tmp.camPos)
         tmp.pos.copy(tmp.camPos).addScaledVector(tmp.fwd, dist)
         tmp.euler.set(0, 0, 0)
         const vFov = THREE.MathUtils.degToRad(cam.fov)
         const visibleH = 2 * Math.tan(vFov / 2) * dist
-        targetScale = (visibleH * 0.85) / CARD_H
+        scale = (visibleH * 0.82) / CARD_H
       } else {
-        // ostatné karty odsunúť dozadu a vyfadeovať
-        tmp.pos.set(0, 0, -6)
+        tmp.pos.set(0, 0, -7)
         tmp.euler.set(0, 0, 0)
-        targetOpacity = 0
+        opacity = 0
       }
     } else {
-      // normálne rozloženie podľa aktuálneho módu
-      const t = computeTarget(mode, index, count, params)
+      const t = computeTarget(mode, index, count, params.radius)
       tmp.pos.set(t.pos.x, t.pos.y, t.pos.z)
       tmp.euler.set(t.rot.x, t.rot.y, t.rot.z)
+
       // hover dôraz
       if (hoveredRef.current === index) {
-        targetScale = 1.12
-        tmp.pos.z += 0.35
+        scale *= 1.14
+        tmp.pos.z += 0.4
+      }
+
+      // push efekt — karty blízko kurzora sa odtlačia (Push Radius / Push Strength)
+      if (params.pushStrength > 0) {
+        m.updateWorldMatrix(true, false)
+        tmp.world.setFromMatrixPosition(m.matrixWorld).project(state.camera)
+        const dx = tmp.world.x - state.pointer.x
+        const dy = tmp.world.y - state.pointer.y
+        const d = Math.hypot(dx, dy)
+        if (d < params.pushRadius) {
+          const f = (1 - d / params.pushRadius) * params.pushStrength
+          const len = Math.hypot(tmp.pos.x, tmp.pos.y) || 1
+          tmp.pos.x += (tmp.pos.x / len) * f
+          tmp.pos.y += (tmp.pos.y / len) * f
+          tmp.pos.z += f * 0.6
+        }
       }
     }
 
     tmp.quat.setFromEuler(tmp.euler)
-
-    // frame-rate nezávislý damping
-    easing.damp3(m.position, tmp.pos, 0.32, dt)
-    easing.dampQ(m.quaternion, tmp.quat, 0.32, dt)
-    easing.damp3(m.scale, [targetScale, targetScale, targetScale], 0.3, dt)
-
+    easing.damp3(m.position, tmp.pos, 0.3, dt)
+    easing.dampQ(m.quaternion, tmp.quat, 0.3, dt)
+    easing.damp3(m.scale, [scale, scale, scale], 0.28, dt)
     if (matRef.current) {
-      easing.damp(matRef.current, 'opacity', targetOpacity, 0.18, dt)
+      easing.damp(matRef.current, 'opacity', opacity, 0.16, dt)
       m.visible = matRef.current.opacity > 0.02
     }
   })
@@ -93,8 +94,8 @@ export default function Card({
   return (
     <RoundedBox
       ref={ref}
-      args={[1, 1.5, 0.05]}
-      radius={0.06}
+      args={[1, 1.4, 0.05]}
+      radius={0.05}
       smoothness={4}
       onPointerOver={(e) => {
         e.stopPropagation()
@@ -120,8 +121,8 @@ export default function Card({
         map={tex}
         transparent
         toneMapped={false}
-        roughness={0.62}
-        metalness={0.08}
+        roughness={0.65}
+        metalness={0.05}
       />
     </RoundedBox>
   )
