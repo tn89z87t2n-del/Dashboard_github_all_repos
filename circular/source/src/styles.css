@@ -24,8 +24,9 @@ body {
   font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
-.app { position: fixed; inset: 0; }
+.app { position: fixed; inset: 0; touch-action: none; }
 .app canvas { display: block; touch-action: none; }
+.explore-m { display: none; } /* mobilný text sa zapne v @media */
 
 /* ===== overlaye ===== */
 .ui {
@@ -153,10 +154,41 @@ body {
 
 /* ===== mobil ===== */
 @media (max-width: 680px) {
-  .seg { padding: 6px 10px; font-size: 11.5px; }
-  .detail .title { font-size: 40px; }
-  .detail-info { left: 22px; bottom: 70px; max-width: 80vw; }
+  .header { padding: 14px 16px; }
+  .footer { padding: 14px 16px; }
   .brand { display: none; }
+  .explore-d { display: none; }
+  .explore-m { display: inline; }
+
+  /* segmented control dolu na stred — palcom dostupné */
+  .segmented {
+    position: fixed; left: 50%; bottom: 58px; transform: translateX(-50%);
+    z-index: 12; padding: 4px;
+  }
+  .seg { padding: 7px 13px; font-size: 12px; }
+
+  /* hore vpravo ostanú len ikony (téma + github) */
+  .iconbtn { width: 36px; height: 36px; }
+
+  /* CONTROLS ako spodný sheet */
+  .controls-toggle { top: auto; bottom: 110px; right: 14px; transform: none; }
+  .controls-toggle.open { transform: none; }
+  .controls-panel {
+    top: auto; bottom: 14px; left: 14px; right: 14px; width: auto;
+    transform: translateY(120%);
+  }
+  .controls-panel.open { transform: translateY(0); }
+
+  .detail .title { font-size: 38px; }
+  .detail-info { left: 18px; right: 18px; bottom: 64px; max-width: none; }
+  .detail .meta { gap: 24px; flex-wrap: wrap; }
+  .close { top: 16px; right: 16px; }
+}
+
+@media (max-width: 400px) {
+  .seg { padding: 6px 10px; font-size: 11px; }
+  .iconbtn { width: 33px; height: 33px; }
+  .detail .title { font-size: 32px; }
 }
 
 button:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }

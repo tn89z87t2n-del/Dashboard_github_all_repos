@@ -7,7 +7,7 @@ import { computeTarget, CARD_H } from './layout.js'
 import { makeCardTexture } from './texture.js'
 
 export default function Card({
-  project, index, count, mode, params, selectedIndex, hoveredRef, onHover, onSelect,
+  project, index, count, mode, params, selectedIndex, draggingRef, hoveredRef, onHover, onSelect,
 }) {
   const ref = useRef()
   const matRef = useRef()
@@ -111,9 +111,10 @@ export default function Card({
         onHover(null)
         document.body.style.cursor = 'auto'
       }}
-      onPointerDown={(e) => {
+      onPointerUp={(e) => {
         e.stopPropagation()
-        if (selectedIndex === null) onSelect(index)
+        // ťuk otvára; ak medzitým prebehlo ťahanie (rotácia), neotváraj
+        if (selectedIndex === null && !(draggingRef && draggingRef.current)) onSelect(index)
       }}
     >
       <meshStandardMaterial

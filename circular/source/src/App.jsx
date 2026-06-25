@@ -30,6 +30,8 @@ export default function App() {
   const [rotation, setRotation] = useState(0) // stupne, ovláda slider + scroll
   const [params, setParams] = useState(DEFAULTS)
   const hoveredRef = useRef(null)
+  const draggingRef = useRef(false)          // true počas ťahania → potlačí ťuk-otvorenie
+  const dragRef = useRef({ active: false, lastX: 0, moved: 0 })
 
   useEffect(() => { document.documentElement.dataset.theme = theme }, [theme])
   useEffect(() => { document.documentElement.dataset.view = view }, [view])
@@ -40,19 +42,38 @@ export default function App() {
   // selectedIndex môže ostať mimo rozsah pri prepnutí view → ošetri
   useEffect(() => { if (selectedIndex !== null && selectedIndex >= count) setSelectedIndex(null) }, [count, selectedIndex])
 
-  // scroll = otáčanie / explore
+  // scroll = otáčanie (desktop)
   const onWheel = useCallback((e) => {
     if (selectedIndex !== null) return
     setRotation((r) => r + e.deltaY * 0.12)
   }, [selectedIndex])
+
+  // ťahanie prstom/myšou = otáčanie (mobil aj desktop); krátky ťuk neotáča → otvorí kartu
+  const onPointerDown = useCallback((e) => {
+    if (selectedIndex !== null) return
+    dragRef.current = { active: true, lastX: e.clientX, moved: 0 }
+    draggingRef.current = false
+  }, [selectedIndex])
+  const onPointerMove = useCallback((e) => {
+    const d = dragRef.current
+    if (!d.active) return
+    const dx = e.clientX - d.lastX
+    d.lastX = e.clientX
+    d.moved += Math.abs(dx)
+    if (d.moved > 8) draggingRef.current = true
+    if (draggingRef.current) setRotation((r) => r - dx * 0.32)
+  }, [])
+  const endDrag = useCallback(() => { dragRef.current.active = false }, [])
 
   const sceneParams = useMemo(() => ({ ...params }), [params])
   const selected = selectedIndex !== null ? projects[selectedIndex] : null
   const active = (selectedIndex ?? hovered ?? 0) + 1
 
   return (
-    <div className="app" onWheel={onWheel}>
-      <Canvas dpr={[1, 2]} camera={{ position: [0, 0, 6.5], fov: 45 }} gl={{ antialias: true }}>
+    <div className="app" onWheel={onWheel}
+      onPointerDown={onPointerDown} onPointerMove={onPointerMove}
+      onPointerUp={endDrag} onPointerLeave={endDrag} onPointerCancel={endDrag}>
+      <Canvas dpr={[1, 1.8]} camera={{ position: [0, 0, 6.5], fov: 45 }} gl={{ antialias: true }}>
         <Scene
           projects={projects}
           mode={mode}
@@ -60,6 +81,7 @@ export default function App() {
           rotation={rotation}
           theme={theme}
           selectedIndex={selectedIndex}
+          draggingRef={draggingRef}
           hoveredRef={hoveredRef}
           onHover={setHovered}
           onSelect={setSelectedIndex}
@@ -121,7 +143,8 @@ export default function App() {
       <footer className="ui footer">
         <div className="status">
           <span className="logo">N</span>
-          <span className="dim">SCROLL TO EXPLORE</span>
+          <span className="dim explore-d">SCROLL TO EXPLORE</span>
+          <span className="dim explore-m">DRAG TO EXPLORE</span>
         </div>
         <div className="counter">{String(active).padStart(2, '0')} — {String(count).padStart(2, '0')}</div>
       </footer>
